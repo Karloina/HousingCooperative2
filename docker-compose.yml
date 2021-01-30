@@ -1,0 +1,147 @@
+version: "3"
+services:
+  discovery-service:
+    container_name: discovery
+    build:
+      context: discovery-service
+    ports:
+      - 8761:8761
+
+  api-gateway:
+    container_name: gateway
+    depends_on:
+      - discovery-service
+    build:
+      context: api-gateway
+    ports:
+      - 8081:8081
+    environment:
+      - DISCOVERY_CLIENT_HOSTNAME=discovery-service
+
+  bill-service:
+    container_name: bill
+    depends_on:
+      - discovery-service
+      - bill-db
+    build:
+      context: bill-service
+#    ports:
+#      - 8092:8092
+    environment:
+      - DISCOVERY_CLIENT_HOSTNAME=discovery-service
+      - KEYCLOAK_REALM=springboot
+      - KEYCLOAK_AUTH_URL=http://192.168.8.34:8080/auth
+      - KEYCLOAK_RESOURCE=bill-client
+      - KEYCLOAK_CREDENTIALS=556a1de4-461a-4d30-b725-f2bdd50b3b77
+      - SPRING_DB_URL=jdbc:postgresql://bill-db/bill
+      - SPRING_DB_USERNAME=postgres
+      - SPRING_DB_PASSWORD=postgres
+
+  bill-db:
+    image: postgres
+    volumes:
+      - bill_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: bill
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  user-service:
+    container_name: user
+    depends_on:
+      - discovery-service
+      - user-db
+    build:
+      context: user-service
+#    ports:
+#      - 8091:8091
+    environment:
+      - DISCOVERY_CLIENT_HOSTNAME=discovery-service
+      - KEYCLOAK_REALM=springboot
+      - KEYCLOAK_AUTH_URL=http://192.168.8.34:8080/auth
+      - KEYCLOAK_RESOURCE=user-client
+      - KEYCLOAK_CREDENTIALS=d3a9bca3-fed1-4436-8c42-1edb245d433e
+      - SPRING_DB_URL=jdbc:postgresql://user-db/user
+      - SPRING_DB_USERNAME=postgres
+      - SPRING_DB_PASSWORD=postgres
+
+  user-db:
+    image: postgres
+    volumes:
+      - user_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: user
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  apartment-service:
+    container_name: apartment
+    depends_on:
+      - discovery-service
+      - apartment-db
+    build:
+      context: apartment-service
+#    ports:
+#      - 8093:8093
+    environment:
+      - DISCOVERY_CLIENT_HOSTNAME=discovery-service
+      - KEYCLOAK_REALM=springboot
+      - KEYCLOAK_AUTH_URL=http://192.168.8.34:8080/auth
+      - KEYCLOAK_RESOURCE=apartment-client
+      - KEYCLOAK_CREDENTIALS=66551629-9d08-49a7-b125-0fabb402fb7e
+      - SPRING_DB_URL=jdbc:postgresql://apartment-db/apartment
+      - SPRING_DB_USERNAME=postgres
+      - SPRING_DB_PASSWORD=postgres
+
+  apartment-db:
+    image: postgres
+    volumes:
+      - apartment_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: apartment
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  postgres:
+    image: postgres
+    volumes:
+      - kc_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:10.0.2
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_SCHEMA: public
+      DB_PASSWORD: password
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+    command:
+      - -Dkeycloak.migration.action=import
+      - -Dkeycloak.migration.provider=singleFile
+      - -Dkeycloak.migration.strategy=IGNORE_EXISTING
+      - -Dkeycloak.migration.file=/opt/jboss/keycloak-config.json
+    ports:
+      - 8080:8080
+    depends_on:
+      - postgres
+    volumes:
+      - ./keycloak-config-export.json:/opt/jboss/keycloak-config.json
+
+  ui-client:
+    build:
+      context: react-ui
+    ports:
+    - 3000:80
+
+volumes:
+  kc_data:
+  apartment_data:
+  bill_data:
+  user_data:
